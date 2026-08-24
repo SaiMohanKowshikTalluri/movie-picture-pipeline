@@ -17,5 +17,6 @@ spec:
       containers:
         - name: backend
           image: ghcr.io/saimohankowshiktalluri/movie-picture-pipeline-backend:latest
+          workingDir: /app
           ports:
             - containerPort: 5000
