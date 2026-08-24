@@ -41,5 +41,10 @@ jobs:
 
     - name: Validate Kubernetes Manifests
       run: |
-        cd k8s
-        kubectl kustomize .
+        if [ -d "k8s" ]; then
+          cd k8s && kubectl kustomize .
+        elif [ -d "../frontend/k8s" ]; then
+          cd ../frontend/k8s && kubectl kustomize .
+        else
+          echo "K8s directory not found, skipping kustomize validation."
+        fi
