@@ -1,4 +1,5 @@
-from movies import app  # Importing the Flask app instance from your movies package
+from __init__ import app
 
 if __name__ == "__main__":
     app.run()
+
