@@ -84,6 +84,6 @@ jobs:
           IMAGE_TAG: ${{ github.sha }}
         run: |
           cd starter/frontend/k8s
-          kubectl set image deployment/frontend frontend=$ECR_REGISTRY/frontend:$IMAGE_TAG --local -o yaml > deployment-updated.yaml
+          kubectl set image deployment/frontend frontend=$ECR_REGISTRY/frontend:$IMAGE_TAG --local -f deployment.yaml -o yaml > deployment-updated.yaml
           mv deployment-updated.yaml deployment.yaml
           kubectl apply -k .
