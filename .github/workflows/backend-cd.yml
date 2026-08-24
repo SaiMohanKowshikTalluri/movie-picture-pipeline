@@ -38,3 +38,8 @@ jobs:
         tags: |
           ghcr.io/saimohankowshiktalluri/movie-picture-pipeline-backend:latest
           ghcr.io/saimohankowshiktalluri/movie-picture-pipeline-backend:${{ github.sha }}
+
+    - name: Validate Kubernetes Manifests
+      run: |
+        cd k8s
+        kubectl apply --dry-run=client -f .
