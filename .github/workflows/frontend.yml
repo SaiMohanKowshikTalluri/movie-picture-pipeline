@@ -29,9 +29,32 @@ jobs:
         working-directory: starter/frontend
         run: npm run lint --if-present
 
-      - name: Build Frontend
+      - name: Build Frontend Application
         working-directory: starter/frontend
         run: npm run build
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: frontend
+          IMAGE_TAG: ${{ github.sha }}
+        working-directory: starter/frontend
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
 
   deploy:
     needs: build-and-test
@@ -48,9 +71,19 @@ jobs:
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: us-east-1
 
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
       - name: Update kubeconfig
         run: aws eks update-kubeconfig --region us-east-1 --name cluster
 
-      - name: Deploy Frontend to EKS
+      - name: Update Kubernetes Image and Deploy
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
         run: |
-          kubectl apply -k starter/frontend/k8s/
+          cd starter/frontend/k8s
+          kubectl set image deployment/frontend frontend=$ECR_REGISTRY/frontend:$IMAGE_TAG --local -o yaml > deployment-updated.yaml
+          mv deployment-updated.yaml deployment.yaml
+          kubectl apply -k .
