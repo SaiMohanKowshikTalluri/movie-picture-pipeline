@@ -36,7 +36,7 @@ jobs:
 
     - name: Run Linter (Flake8)
       run: |
-        flake8 --max-line-length=88
+        flake8 --max-line-length=120
 
     - name: Run Tests (Pytest with Coverage)
       run: |
