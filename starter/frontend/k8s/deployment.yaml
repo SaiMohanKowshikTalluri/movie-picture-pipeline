@@ -16,6 +16,6 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: frontend
+          image: ghcr.io/saimohankowshiktalluri/movie-picture-pipeline-frontend:latest
           ports:
             - containerPort: 3000
