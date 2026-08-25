@@ -2,53 +2,115 @@ name: Frontend Continuous Deployment
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
     paths:
       - 'starter/frontend/**'
-      - '.github/workflows/frontend-cd.yml'
+      - '.github/workflows/frontend-cd.yaml'
   workflow_dispatch:
 
 jobs:
-  build-and-push:
+  lint:
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: ./starter/frontend
     steps:
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: starter/frontend/package-lock.json
 
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Dependencies
+        run: npm ci
 
-    - name: Build and Push Docker Image
-      uses: docker/build-push-action@v5
-      with:
-        context: ./starter/frontend
-        file: ./starter/frontend/Dockerfile
-        push: true
-        build-args: |
-          REACT_APP_MOVIE_API_URL=http://a4604fa2070444ace825a73b1a3368a2-2070895866.us-east-1.elb.amazonaws.com
-        tags: |
-          ghcr.io/saimohankowshiktalluri/movie-picture-pipeline-frontend:latest
-          ghcr.io/saimohankowshiktalluri/movie-picture-pipeline-frontend:${{ github.sha }}
+      - name: Lint
+        run: npm run lint
 
-    - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-        aws-region: us-east-1
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./starter/frontend
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    - name: Update Kubeconfig for EKS
-      run: aws eks update-kubeconfig --region us-east-1 --name cluster
+      - name: Set up Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: starter/frontend/package-lock.json
 
-    - name: Deploy to EKS Cluster
-      run: |
-        cd starter/frontend/k8s && kubectl apply -k . || kubectl apply -f .
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Test
+        run: npm test -- --watchAll=false
+
+  build:
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    outputs:
+      registry: ${{ steps.login-ecr.outputs.registry }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: movie-frontend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg REACT_APP_MOVIE_API_URL=${{ secrets.REACT_APP_MOVIE_API_URL }} \
+            -t $REGISTRY/$REPOSITORY:$IMAGE_TAG \
+            -t $REGISTRY/$REPOSITORY:latest \
+            ./starter/frontend
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+          docker push $REGISTRY/$REPOSITORY:latest
+
+  deploy:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Update Kubeconfig for EKS
+        run: aws eks update-kubeconfig --region us-east-1 --name cluster
+
+      - name: Deploy to EKS Cluster
+        env:
+          REGISTRY: ${{ needs.build.outputs.registry }}
+          REPOSITORY: movie-frontend
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          cd starter/frontend/k8s
+          kustomize edit set image frontend=$REGISTRY/$REPOSITORY:$IMAGE_TAG
+          kubectl apply -k .
+          kubectl rollout status deployment/frontend
