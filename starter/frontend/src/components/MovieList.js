@@ -6,10 +6,8 @@ import axios from 'axios';
 function MovieList({ onMovieClick }) {
   const [movies, setMovies] = useState([]);
 
-  useEffect(() => {
-    const apiUrl =
-      process.env.REACT_APP_MOVIE_API_URL ||
-      'http://afa9734f344c94017a3f906b6bd9d756-737657875.us-east-1.elb.amazonaws.com';
+ useEffect(() => {
+    const apiUrl = process.env.REACT_APP_MOVIE_API_URL || 'http://127.0.0.1:5000';
     axios.get(`${apiUrl}/movies`).then((response) => {
       setMovies(response.data.movies);
     });
