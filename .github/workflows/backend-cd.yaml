@@ -108,4 +108,4 @@ jobs:
           cd k8s
           kustomize edit set image backend=${{ steps.login-ecr.outputs.registry }}/backend:${{ github.sha }}
           kustomize build | kubectl apply -f -
-          kubectl rollout status deployment/backend --timeout=300s
+          kubectl rollout status deployment/backend --timeout=180s || (kubectl get pods && kubectl describe pod -l app=backend && exit 1)

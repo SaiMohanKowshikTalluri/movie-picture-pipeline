@@ -121,4 +121,4 @@ jobs:
           cd k8s
           kustomize edit set image frontend=${{ steps.login-ecr.outputs.registry }}/frontend:${{ github.sha }}
           kustomize build | kubectl apply -f -
-          kubectl rollout status deployment/frontend --timeout=300s
+          kubectl rollout status deployment/frontend --timeout=180s || (kubectl get pods && kubectl describe pod -l app=frontend && exit 1)
