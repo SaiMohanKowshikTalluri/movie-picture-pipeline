@@ -2,11 +2,16 @@ name: Backend Continuous Deployment
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
     paths:
       - 'starter/backend/**'
       - '.github/workflows/backend-cd.yaml'
   workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER_NAME: cluster
 
 jobs:
   lint:
@@ -14,20 +19,23 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./starter/backend
+        working-directory: starter/backend
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: Install Pipenv and dependencies
+
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pipenv
           pipenv install --dev
-      - name: Lint with flake8 via pipenv
+
+      - name: Run linting
         run: |
           pipenv run flake8 --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=venv,.venv,.git,__pycache__
           pipenv run flake8 --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv,.venv,.git,__pycache__
@@ -37,30 +45,38 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: ./starter/backend
+        working-directory: starter/backend
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-      - name: Install Pipenv and dependencies
+
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pipenv
           pipenv install --dev
-      - name: Test with pytest via pipenv
-        run: |
-          pipenv run pytest
 
-  deploy:
+      - name: Run tests
+        run: pipenv run test
+
+  build-and-deploy:
     name: Build, Push and Deploy Backend
     needs: [lint, test]
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: starter/backend
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Setup Kustomize
+        uses: imranismail/setup-kustomize@v2
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -68,35 +84,28 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: us-east-1
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: Log in to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, and push image to Amazon ECR
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: backend
-          IMAGE_TAG: ${{ github.sha }}
+      - name: Build Docker Image
         run: |
           docker build \
-            -t $REGISTRY/$REPOSITORY:$IMAGE_TAG \
-            -t $REGISTRY/$REPOSITORY:latest \
-            ./starter/backend
-          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
-          docker push $REGISTRY/$REPOSITORY:latest
+            -t ${{ steps.login-ecr.outputs.registry }}/backend:${{ github.sha }} \
+            -t ${{ steps.login-ecr.outputs.registry }}/backend:latest \
+            .
 
-      - name: Update kube config
-        run: aws eks update-kubeconfig --name cluster --region us-east-1
-
-      - name: Deploy to EKS
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: backend
-          IMAGE_TAG: ${{ github.sha }}
+      - name: Push Docker Image to Amazon ECR
         run: |
-          cd starter/backend/k8s
-          kustomize edit set image backend=$REGISTRY/$REPOSITORY:$IMAGE_TAG
-          kubectl apply -k .
-          kubectl rollout status deployment/backend
+          docker push ${{ steps.login-ecr.outputs.registry }}/backend:${{ github.sha }}
+          docker push ${{ steps.login-ecr.outputs.registry }}/backend:latest
+
+      - name: Deploy to Amazon EKS
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+          cd k8s
+          kustomize edit set image backend=${{ steps.login-ecr.outputs.registry }}/backend:${{ github.sha }}
+          kustomize build | kubectl apply -f -
+          kubectl rollout status deployment/backend --timeout=300s
