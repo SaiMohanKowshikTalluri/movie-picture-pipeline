@@ -10,6 +10,11 @@ data:
       groups:
         - system:bootstrappers
         - system:nodes
+    - rolearn: arn:aws:iam::500855353618:role/udacity-node-group
+      username: system:node:{{SessionName}}
+      groups:
+        - system:bootstrappers
+        - system:nodes
   mapUsers: |
     - userarn: arn:aws:iam::500855353618:user/github-action-user
       username: github-action-role
