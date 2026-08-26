@@ -1,65 +1,195 @@
-# Movie Picture Pipeline - Udacity DevOps Project
+# Movie Picture Pipeline - CI/CD with GitHub Actions
 
 * **GitHub Repository:** [https://github.com/SaiMohanKowshikTalluri/movie-picture-pipeline.git](https://github.com/SaiMohanKowshikTalluri/movie-picture-pipeline.git)
 * **Frontend Live URL:** [http://a59c8578e1a4a44ae8022c77e2d7e6ba-597448204.us-east-1.elb.amazonaws.com](http://a59c8578e1a4a44ae8022c77e2d7e6ba-597448204.us-east-1.elb.amazonaws.com)
 
-You've been brought on as the DevOps resource for a development team that manages a web application that is a catalog of Movie Picture movies. They're in dire need of automating their development workflows in hopes of accelerating their release cycle. They'd like to use Github Actions to automate testing, building and deploying their applications to an existing Kubernetes cluster.
+---
 
-The team's project is comprised of 2 applications.
+## Project Overview
 
-1. A frontend UI written in Typescript, using the React framework
-2. A backend API written in Python using the Flask framework.
-
-You'll find 2 folders, one named `frontend` and one named `backend`, where each application's source code is maintained. Your job is to use the team's [existing documentation](#frontend-development-notes) and create CI/CD pipelines to meet the teams' needs.
+The **Movie Picture Pipeline** project implements an enterprise-grade, fully automated CI/CD pipeline using **GitHub Actions** for a microservices movie catalog web application comprising:
+1. **Frontend**: A React / TypeScript UI displaying movies and movie details.
+2. **Backend**: A Flask / Python RESTful API serving movie endpoints.
+3. **Container Registry**: Amazon Elastic Container Registry (ECR).
+4. **Container Orchestration**: Amazon Elastic Kubernetes Service (EKS).
 
 ---
 
-## Deliverables
+## Architecture & Pipeline Structure
 
-### Frontend
-
-1. A Continuous Integration workflow that:
-   1. Runs on `pull_requests` against the `main` branch, only when code in the frontend application changes.
-   2. Is able to be run on-demand (i.e. manually without needing to push code)
-   3. Runs the following jobs in parallel:
-      1. Runs a linting job that fails if the code doesn't adhere to eslint rules
-      2. Runs a test job that fails if the test suite doesn't pass
-   4. Runs a build job only if the lint and test jobs pass and successfully builds the application
-2. A Continuous Deployment workflow that:
-   1. Runs on `push` against the `main` branch, only when code in the frontend application changes.
-   2. Is able to be run on-demand (i.e. manually without needing to push code)
-   3. Runs the same lint/test jobs as the Continuous Integration workflow
-   4. Runs a build job only when the lint and test jobs pass
-      1. The built docker image should be tagged with the git sha
-   5. Runs a deploy job that applies the Kubernetes manifests to the provided cluster.
-      1. The manifest should deploy the newly created tagged image
-      2. The tag applied to the image should be the git SHA of the commit that triggered the build
-
-### Backend
-
-1. A Continuous Integration workflow that:
-   1. Runs on `pull_requests` against the `main` branch, only when code in the backend application changes.
-   2. Is able to be run on-demand (i.e. manually without needing to push code)
-   3. Runs the following jobs in parallel:
-      1. Runs a linting job that fails if the code doesn't adhere to rules
-      2. Runs a test job that fails if the test suite doesn't pass
-   4. Runs a build job only if the lint and test jobs pass and successfully builds the application
-2. A Continuous Deployment workflow that:
-   1. Runs on `push` against the `main` branch, only when code in the backend application changes.
-   2. Is able to be run on-demand (i.e. manually without needing to push code)
-   3. Runs the same lint/test jobs as the Continuous Integration workflow
-   4. Runs a build job only when the lint and test jobs pass
-      1. The built docker image should be tagged with the git sha
-   5. Runs a deploy job that applies the Kubernetes manifests to the provided cluster.
-      1. The manifest should deploy the newly created tagged image
-      2. The tag applied to the image should be the git SHA of the commit that triggered the build
+```
++-----------------------------------------------------------------------------------+
+|                              GITHUB ACTIONS CI/CD                                 |
++-----------------------------------------------------------------------------------+
+|                                                                                   |
+|  [Pull Request to main]                                                           |
+|         |                                                                         |
+|         +---> Frontend CI (.github/workflows/frontend-ci.yaml)                    |
+|         |        ├── Parallel: [Lint (ESLint)]  &  [Test (Jest)]                  |
+|         |        └── Sequential: [Build (Docker Build)]                           |
+|         |                                                                         |
+|         +---> Backend CI (.github/workflows/backend-ci.yaml)                      |
+|                  ├── Parallel: [Lint (flake8)]  &  [Test (pytest)]                |
+|                  └── Sequential: [Build (Docker Build)]                           |
+|                                                                                   |
+|  [Push / Merge to main]                                                           |
+|         |                                                                         |
+|         +---> Frontend CD (.github/workflows/frontend-cd.yaml)                    |
+|         |        ├── Parallel: [Lint]  &  [Test]                                  |
+|         |        ├── Build: Tag with Git SHA + Push to Amazon ECR                 |
+|         |        └── Deploy: Update Kustomize Manifest & Deploy to Amazon EKS     |
+|         |                                                                         |
+|         +---> Backend CD (.github/workflows/backend-cd.yaml)                     |
+|                  ├── Parallel: [Lint]  &  [Test]                                  |
+|                  ├── Build: Tag with Git SHA + Push to Amazon ECR                 |
+|                  └── Deploy: Update Kustomize Manifest & Deploy to Amazon EKS     |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+```
 
 ---
 
-## One-time setup instructions
+## Workflow Deliverables & Specifications
 
-### Login
-Launch the Udacity workspace and open the terminal in VSCode to start executing the following commands:
-1. Start the login process with `gh`
+### 1. Frontend Continuous Integration (`frontend-ci.yaml`)
+- **Path**: `.github/workflows/frontend-ci.yaml`
+- **Trigger**: `pull_request` on branch `main` targeting `starter/frontend/**` and `.github/workflows/frontend-ci.yaml`, plus manual `workflow_dispatch`.
+- **Jobs**:
+  - `lint`: Restores npm cache, installs dependencies via `npm ci`, and executes `npm run lint`.
+  - `test`: Restores npm cache, installs dependencies via `npm ci`, and executes `npm test -- --watchAll=false`.
+  - *(Runs `lint` and `test` in parallel)*
+  - `build`: Runs only after `lint` and `test` succeed (`needs: [lint, test]`), executes test verification, and builds Docker container (`docker build -t movie-frontend:ci .`).
+
+### 2. Backend Continuous Integration (`backend-ci.yaml`)
+- **Path**: `.github/workflows/backend-ci.yaml`
+- **Trigger**: `pull_request` on branch `main` targeting `starter/backend/**` and `.github/workflows/backend-ci.yaml`, plus manual `workflow_dispatch`.
+- **Jobs**:
+  - `lint`: Sets up Python 3.10 with pip cache, installs `pipenv` & dependencies, and executes `pipenv run flake8`.
+  - `test`: Sets up Python 3.10 with pip cache, installs `pipenv` & dependencies, and executes `pipenv run pytest`.
+  - *(Runs `lint` and `test` in parallel)*
+  - `build`: Runs only after `lint` and `test` succeed (`needs: [lint, test]`) and builds Docker container (`docker build -t movie-backend:ci ./starter/backend`).
+
+### 3. Frontend Continuous Deployment (`frontend-cd.yaml`)
+- **Path**: `.github/workflows/frontend-cd.yaml`
+- **Trigger**: `push` on branch `main` targeting `starter/frontend/**` and `.github/workflows/frontend-cd.yaml`, plus manual `workflow_dispatch`.
+- **Jobs**:
+  - `lint` & `test`: Run in parallel, ensuring clean code and passing Jest test suites.
+  - `build` (`needs: [lint, test]`):
+    - Authenticates to AWS using GitHub Secrets (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_SESSION_TOKEN`).
+    - Logs into Amazon ECR via `aws-actions/amazon-ecr-login@v2`.
+    - Builds image passing `--build-arg REACT_APP_MOVIE_API_URL=${{ secrets.REACT_APP_MOVIE_API_URL }}`.
+    - Tags image with `${{ github.sha }}` and `latest`.
+    - Pushes images to Amazon ECR repository `movie-frontend`.
+  - `deploy` (`needs: [build]`):
+    - Configures AWS credentials and updates kubeconfig (`aws eks update-kubeconfig --region us-east-1 --name cluster`).
+    - Updates image tag using `kustomize edit set image frontend=$REGISTRY/$REPOSITORY:$IMAGE_TAG`.
+    - Deploys manifests to EKS with `kubectl apply -k .`.
+    - Verifies rollout status with `kubectl rollout status deployment/frontend`.
+
+### 4. Backend Continuous Deployment (`backend-cd.yaml`)
+- **Path**: `.github/workflows/backend-cd.yaml`
+- **Trigger**: `push` on branch `main` targeting `starter/backend/**` and `.github/workflows/backend-cd.yaml`, plus manual `workflow_dispatch`.
+- **Jobs**:
+  - `lint` & `test`: Run in parallel, verifying flake8 linting and pytest test suites.
+  - `build` (`needs: [lint, test]`):
+    - Authenticates to AWS via GitHub Secrets.
+    - Logs into Amazon ECR via `aws-actions/amazon-ecr-login@v2`.
+    - Builds image tagged with `${{ github.sha }}` and `latest`.
+    - Pushes images to Amazon ECR repository `movie-backend`.
+  - `deploy` (`needs: [build]`):
+    - Updates kubeconfig for EKS cluster `cluster`.
+    - Updates image tag using `kustomize edit set image backend=$REGISTRY/$REPOSITORY:$IMAGE_TAG`.
+    - Applies Kubernetes manifests with `kubectl apply -k .`.
+    - Verifies rollout status with `kubectl rollout status deployment/backend`.
+
+---
+
+## Security & GitHub Secrets Configuration
+
+No AWS credentials or secret tokens are hardcoded in any pipeline file. Workflows retrieve credentials securely from GitHub Repository Secrets:
+
+| Secret Name | Description |
+| :--- | :--- |
+| `AWS_ACCESS_KEY_ID` | AWS Access Key ID for IAM user `github-action-user` |
+| `AWS_SECRET_ACCESS_KEY` | AWS Secret Access Key for IAM user `github-action-user` |
+| `AWS_SESSION_TOKEN` | AWS Session Token (for temporary lab credentials) |
+| `REACT_APP_MOVIE_API_URL` | Backend REST API endpoint URL (e.g. Backend ELB address) |
+
+---
+
+## Local Development & Testing
+
+### Frontend Local Setup
 ```bash
-gh auth login
+cd starter/frontend
+
+# Install dependencies
+npm ci
+
+# Run linting
+npm run lint
+
+# Auto-fix linting issues
+npm run lint -- --fix
+
+# Run tests
+npm test -- --watchAll=false
+
+# Run development server
+REACT_APP_MOVIE_API_URL=http://localhost:5000 npm start
+```
+
+### Backend Local Setup
+```bash
+cd starter/backend
+
+# Install dependencies
+pipenv install --dev
+
+# Run linting
+pipenv run flake8 --exclude=venv,.venv,.git,__pycache__
+
+# Run unit tests
+pipenv run pytest
+
+# Run API locally
+pipenv run serve
+```
+
+---
+
+## Infrastructure Provisioning & Teardown
+
+### Provision Infrastructure with Terraform
+```bash
+cd setup/terraform
+terraform init
+terraform apply -auto-approve
+```
+
+### Configure Kubernetes Access for GitHub Actions
+```bash
+aws eks update-kubeconfig --name cluster --region us-east-1
+cd setup
+chmod +x init.sh
+./init.sh
+```
+
+### Teardown AWS Resources
+To avoid ongoing AWS charges or credit depletion, destroy all provisioned infrastructure upon completion:
+```bash
+cd setup/terraform
+terraform destroy -auto-approve
+```
+
+---
+
+## Deployment Verification
+
+1. **Backend Endpoint Verification**:
+   - `GET /movies` -> returns status `200 OK` with JSON array of movie objects.
+2. **Frontend UI Verification**:
+   - Loads movie catalog from Backend API URL.
+   - Clicking a movie item renders detailed movie description.
+3. **Pipeline Screenshots**:
+   - Stored in the `screenshots/` directory verifying GitHub Actions workflow runs, ECR image pushes, and Kubernetes cluster deployments.
