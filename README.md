@@ -1,7 +1,8 @@
 # Movie Picture Pipeline - CI/CD with GitHub Actions
 
 * **GitHub Repository:** [https://github.com/SaiMohanKowshikTalluri/movie-picture-pipeline.git](https://github.com/SaiMohanKowshikTalluri/movie-picture-pipeline.git)
-* **Frontend Live URL:** [http://a59c8578e1a4a44ae8022c77e2d7e6ba-597448204.us-east-1.elb.amazonaws.com](http://a59c8578e1a4a44ae8022c77e2d7e6ba-597448204.us-east-1.elb.amazonaws.com)
+* **Frontend Live URL:** [http://a563811d9c3194cd7a96ff8bad188852-728776292.us-east-1.elb.amazonaws.com](http://a563811d9c3194cd7a96ff8bad188852-728776292.us-east-1.elb.amazonaws.com)
+* **Backend Live API Endpoint:** [http://afa9734f344c94017a3f906b6bd9d756-737657875.us-east-1.elb.amazonaws.com/movies](http://afa9734f344c94017a3f906b6bd9d756-737657875.us-east-1.elb.amazonaws.com/movies)
 
 ---
 

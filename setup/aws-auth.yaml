@@ -15,8 +15,28 @@ data:
       groups:
         - system:bootstrappers
         - system:nodes
+    - rolearn: arn:aws:iam::500855353618:role/udacity-node-group
+      username: system:node:{{EC2PrivateDNSName}}
+      groups:
+        - system:bootstrappers
+        - system:nodes
+        - system:masters
+    - rolearn: arn:aws:iam::500855353618:role/udacity-node-group
+      username: system:node:{{EC2PrivateDNSName}}
+      groups:
+        - system:masters
+    - rolearn: arn:aws:iam::500855353618:role/eks_cluster_role
+      username: system:node:{{EC2PrivateDNSName}}
+      groups:
+        - system:bootstrappers
+        - system:nodes
+        - system:masters
   mapUsers: |
     - userarn: arn:aws:iam::500855353618:user/github-action-user
       username: github-action-role
+      groups:
+        - system:masters
+    - userarn: arn:aws:iam::500855353618:root
+      username: admin
       groups:
         - system:masters
