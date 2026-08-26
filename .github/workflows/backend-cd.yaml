@@ -10,12 +10,14 @@ on:
 
 jobs:
   lint:
+    name: Lint Backend
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./starter/backend
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -31,12 +33,14 @@ jobs:
           pipenv run flake8 --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv,.venv,.git,__pycache__
 
   test:
+    name: Test Backend
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./starter/backend
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -50,13 +54,13 @@ jobs:
         run: |
           pipenv run pytest
 
-  build:
+  deploy:
+    name: Build, Push and Deploy Backend
     needs: [lint, test]
     runs-on: ubuntu-latest
-    outputs:
-      registry: ${{ steps.login-ecr.outputs.registry }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -83,26 +87,12 @@ jobs:
           docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
           docker push $REGISTRY/$REPOSITORY:latest
 
-  deploy:
-    needs: [build]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
-          aws-region: us-east-1
-
       - name: Update kube config
         run: aws eks update-kubeconfig --name cluster --region us-east-1
 
       - name: Deploy to EKS
         env:
-          REGISTRY: ${{ needs.build.outputs.registry }}
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           REPOSITORY: backend
           IMAGE_TAG: ${{ github.sha }}
         run: |

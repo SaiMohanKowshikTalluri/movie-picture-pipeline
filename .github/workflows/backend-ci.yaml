@@ -1,11 +1,6 @@
 name: Backend Continuous Integration
 
 on:
-  push:
-    branches: [ "main" ]
-    paths:
-      - 'starter/backend/**'
-      - '.github/workflows/backend-ci.yaml'
   pull_request:
     branches: [ "main" ]
     paths:
@@ -15,12 +10,14 @@ on:
 
 jobs:
   lint:
+    name: Lint Backend
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./starter/backend
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -36,12 +33,14 @@ jobs:
           pipenv run flake8 --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics --exclude=venv,.venv,.git,__pycache__
 
   test:
+    name: Test Backend
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ./starter/backend
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -56,9 +55,11 @@ jobs:
           pipenv run pytest
 
   build:
+    name: Build Backend Docker Image
     needs: [lint, test]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
       - name: Build Docker image
-        run: docker build -t movie-backend:ci ./starter/backend
+        run: docker build -t backend:ci ./starter/backend
