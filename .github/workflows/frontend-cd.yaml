@@ -76,7 +76,7 @@ jobs:
       - name: Build, tag, and push image to Amazon ECR
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: movie-frontend
+          REPOSITORY: frontend
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build \
@@ -107,7 +107,7 @@ jobs:
       - name: Deploy to EKS Cluster
         env:
           REGISTRY: ${{ needs.build.outputs.registry }}
-          REPOSITORY: movie-frontend
+          REPOSITORY: frontend
           IMAGE_TAG: ${{ github.sha }}
         run: |
           cd starter/frontend/k8s
