@@ -7,7 +7,7 @@ function MovieList({ onMovieClick }) {
   const [movies, setMovies] = useState([]);
 
   useEffect(() => {
-   const apiUrl = process.env.REACT_APP_MOVIE_API_URL || 'http://afa9734f344c94017a3f906b6bd9d756-737657875.us-east-1.elb.amazonaws.com';
+   const apiUrl = process.env.REACT_APP_MOVIE_API_URL || 'http://afa9734f344c94017a3f906b6bd9d756-737657875.us-east-1.elb.amazonaws.com/movies';
     axios.get(`${apiUrl}/movies`)
       .then((response) => {
         // Handles both direct arrays and object wrappers just in case
